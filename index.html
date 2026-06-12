@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuadraBlast</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- MENU -->
+  <div id="screen-menu" class="screen active">
+    <div class="menu-header">
+      <div class="streak-badge" id="menu-streak">
+        <span class="streak-fire">🔥</span>
+        <span id="streak-count">0</span>
+        <span class="streak-label">dias</span>
+      </div>
+    </div>
+    <div class="logo">
+      <h1 class="logo-title">Quad<span class="logo-accent">rA</span>Blast</h1>
+      <p class="logo-sub">Matemática com Estilo</p>
+    </div>
+    <div class="difficulty-cards">
+      <button class="diff-card easy" data-level="easy">
+        <span class="diff-icon">🌱</span>
+        <span class="diff-name">Fácil</span>
+        <span class="diff-desc">1º grau básico<br>ax + b = 0</span>
+      </button>
+      <button class="diff-card medium" data-level="medium">
+        <span class="diff-icon">⚡</span>
+        <span class="diff-name">Médio</span>
+        <span class="diff-desc">1º grau avançado<br>ax + b = cx + d</span>
+      </button>
+      <button class="diff-card hard" data-level="hard">
+        <span class="diff-icon">💀</span>
+        <span class="diff-name">Difícil</span>
+        <span class="diff-desc">2º grau básico<br>x² + bx + c = 0</span>
+      </button>
+    </div>
+    <div class="highscore-display">
+      <span class="hs-label">Recorde:</span>
+      <span id="menu-highscore">0</span>
+      <span class="hs-label">pts</span>
+    </div>
+    <div class="inf-direct-section">
+      <span class="inf-direct-label">♾️ Modo Ilimitado</span>
+      <div class="inf-direct-row">
+        <button class="inf-direct-btn easy"   data-level="easy">🌱 Fácil</button>
+        <button class="inf-direct-btn medium" data-level="medium">⚡ Médio</button>
+        <button class="inf-direct-btn hard"   data-level="hard">💀 Difícil</button>
+      </div>
+    </div>
+    <button id="btn-credits" class="btn-credits-corner">Créditos</button>
+    <div class="author-credit">Henrique Locks</div>
+  </div>
+
+  <!-- CRÉDITOS -->
+  <div id="screen-credits" class="screen">
+    <div class="credits-wrap">
+      <div class="credits-title">✨ Créditos</div>
+      <div class="credits-card">
+        <div class="credits-label">Criadores</div>
+        <div class="credits-names">
+          <span class="credits-name">Henrique Locks</span>
+          <span class="credits-and">&</span>
+          <span class="credits-name claudinho">Claudinho</span>
+        </div>
+      </div>
+      <div class="credits-sub">QuadraBlast — Matemática com Estilo</div>
+      <button id="btn-credits-back" class="btn-secondary">← Voltar ao Menu</button>
+    </div>
+  </div>
+
+  <!-- TUTORIAL -->
+  <div id="screen-tutorial" class="screen">
+    <div class="tut-wrap">
+      <div class="tut-topbar">
+        <div class="tut-dots" id="tut-dots"></div>
+        <button id="btn-skip" class="btn-tut-skip">Pular →</button>
+      </div>
+      <div class="tut-slide-area" id="tut-slide-area"></div>
+      <div class="tut-bottom">
+        <div class="tut-progress-wrap">
+          <div class="tut-progress-fill" id="tut-progress-fill"></div>
+        </div>
+        <div class="tut-nav-btns">
+          <button id="btn-tut-prev" class="btn-tut-nav">← Anterior</button>
+          <button id="btn-tut-next" class="btn-tut-nav primary">Próximo →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SELEÇÃO DE INÍCIO DO MODO ILIMITADO -->
+  <div id="screen-inf-start" class="screen">
+    <div class="inf-start-wrap">
+      <div class="inf-start-title">♾️ Modo Ilimitado</div>
+      <div class="inf-start-level" id="inf-start-level">🌱 Fácil</div>
+      <div class="inf-start-options">
+        <button id="btn-inf-from-q1" class="btn-primary">▶ Começar da Q1</button>
+        <div class="inf-start-or">— ou pule para —</div>
+        <div class="inf-start-jump">
+          <input type="number" id="inf-start-q" min="1" max="500"
+                 placeholder="Número da questão (ex: 50)" class="inf-start-input">
+          <button id="btn-inf-from-q" class="btn-infinite">Ir para essa questão →</button>
+        </div>
+      </div>
+      <button id="btn-inf-start-back" class="btn-back-link">← Voltar ao Menu</button>
+    </div>
+  </div>
+
+  <!-- JOGO -->
+  <div id="screen-game" class="screen">
+    <button id="btn-game-menu" class="btn-game-back">← Menu</button>
+    <div class="game-topbar">
+      <div class="combo-display" id="combo-display">
+        <span class="combo-fire" id="combo-fire"></span>
+        <span class="combo-num" id="combo-num">0</span>
+        <span class="combo-label">combo</span>
+        <span class="combo-mult" id="combo-mult"></span>
+      </div>
+      <div class="score-display">
+        <span id="current-score">0</span>
+        <span class="score-label">pts</span>
+      </div>
+      <div class="progress-display" id="progress-display">
+        <span id="q-current">1</span><span class="prog-sep">/</span><span id="q-total">10</span>
+      </div>
+      <div class="lives-display hidden" id="lives-display"></div>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+
+    <div class="inf-badge hidden" id="inf-badge">
+      <span class="inf-badge-icon">♾️</span>
+      <span id="inf-q-num">Q: 1</span>
+      <span class="inf-tier-pill" id="inf-tier-pill">Nível 1</span>
+    </div>
+
+    <div class="inf-timer-wrap hidden" id="inf-timer-wrap">
+      <div class="inf-timer-bar-bg">
+        <div class="inf-timer-bar safe" id="inf-timer-bar"></div>
+      </div>
+      <span class="inf-timer-text" id="inf-timer-text">5:00</span>
+    </div>
+
+    <div class="equation-wrap" id="equation-wrap">
+      <div class="eq-type-label" id="eq-type-label"></div>
+      <div class="equation-box" id="equation-box"></div>
+    </div>
+
+    <div class="options-grid" id="options-grid"></div>
+
+    <div class="feedback-banner" id="feedback-banner"></div>
+    <div id="particles-container"></div>
+    <div class="combo-milestone" id="combo-milestone"></div>
+    <div class="life-event" id="life-event"></div>
+    <div class="no-life-alert" id="no-life-alert">⚠️ A partir de agora sem recuperar vida!</div>
+  </div>
+
+  <!-- RESULTADO (quiz normal) -->
+  <div id="screen-result" class="screen">
+    <div class="result-wrap">
+      <div class="result-title" id="result-title">Fim de Jogo!</div>
+      <div class="result-stars" id="result-stars"></div>
+      <div class="result-stats">
+        <div class="stat-item">
+          <span class="stat-val" id="res-score">0</span>
+          <span class="stat-lbl">pontos</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-val" id="res-correct">0/10</span>
+          <span class="stat-lbl">acertos</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-val" id="res-combo">0</span>
+          <span class="stat-lbl">combo máx</span>
+        </div>
+      </div>
+      <div class="result-streak">
+        <span class="streak-fire">🔥</span>
+        <span id="res-streak">0</span>
+        <span> dias de streak</span>
+      </div>
+      <div id="new-record-badge" class="new-record hidden">NOVO RECORDE! 🏆</div>
+      <div class="result-buttons column">
+        <button id="btn-replay" class="btn-primary">Jogar Novamente</button>
+        <button id="btn-infinite" class="btn-infinite">♾️ Modo Ilimitado</button>
+        <button id="btn-menu" class="btn-secondary">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER DO MODO ILIMITADO -->
+  <div id="screen-infinite-over" class="screen">
+    <div class="inf-over-wrap">
+      <div class="inf-over-icon" id="inf-over-icon">☠️</div>
+      <div class="inf-over-title">Modo Ilimitado</div>
+      <div class="inf-over-subtitle" id="inf-over-subtitle">Fim de Jogo!</div>
+      <div class="result-stats">
+        <div class="stat-item">
+          <span class="stat-val" id="inf-q-reached">0</span>
+          <span class="stat-lbl">questões</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-val" id="inf-final-score">0</span>
+          <span class="stat-lbl">pontos</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-val" id="inf-final-combo">0</span>
+          <span class="stat-lbl">combo máx</span>
+        </div>
+      </div>
+      <div class="inf-tier-reached">
+        Nível de dificuldade alcançado:
+        <span class="inf-tier-val" id="inf-tier-reached">1</span>/15
+      </div>
+      <div class="inf-records">
+        <div class="inf-rec-row">
+          <span class="inf-rec-label">Melhor questão:</span>
+          <span class="inf-rec-val" id="inf-best-q">0</span>
+        </div>
+        <div class="inf-rec-row">
+          <span class="inf-rec-label">Melhor score:</span>
+          <span class="inf-rec-val" id="inf-best-score">0</span>
+        </div>
+      </div>
+      <div id="inf-new-record" class="new-record hidden">NOVO RECORDE! 🏆</div>
+      <div class="result-buttons column">
+        <button id="btn-inf-retry" class="btn-primary">Tentar de Novo ♾️</button>
+        <button id="btn-inf-menu" class="btn-secondary">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
