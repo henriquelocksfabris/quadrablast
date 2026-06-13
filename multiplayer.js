@@ -459,7 +459,6 @@ async function mpHostAdvanceQuestion() {
   mpShowQResult(updates['qResult']);
 
   setTimeout(async () => {
-    showScreen('mpHost');
     mp.currentQIdx++;
     const isQuestionMode = (mp.config.roundType || 'time') === 'questions';
     const shouldEndRound = isQuestionMode
@@ -468,6 +467,7 @@ async function mpHostAdvanceQuestion() {
     if (shouldEndRound) {
       await mpHostEndRound();
     } else {
+      showScreen('mpHost');
       await mpHostStartNextQuestion();
     }
   }, 3500);
@@ -486,9 +486,10 @@ async function mpHostEndRound() {
   mp.currentRound++;
 
   const playersSnap = await mpRoomRef('players').once('value');
-  const updates = { status: 'round-end', round: mp.currentRound };
+  const updates = { status: 'round-end', round: mp.currentRound, currentQ: null };
   Object.keys(playersSnap.val() || {}).forEach(pid => {
     updates[`players/${pid}/roundScore`] = 0;
+    updates[`players/${pid}/answers`]    = null;
   });
   await mpRoomRef().update(updates);
 
@@ -534,6 +535,9 @@ function mpAttachGameListeners() {
     if (status === 'round-end') {
       clearInterval(mp.qTimer);
       mp.currentRound++;
+      mp.lastRenderedQIdx = -1;
+      mp.qResultShown     = false;
+      mp.answered         = false;
       $('mp-game-round').textContent = `Rodada ${mp.currentRound}`;
     } else if (status === 'finished') {
       clearInterval(mp.qTimer);
@@ -846,6 +850,9 @@ function mpSetupEvents() {
     mpDetachListeners();
     clearInterval(mp.qTimer);
     clearInterval(mp.roundTimer);
+    if (mp.isHost && mp.roomCode) {
+      mp.db.ref(`rooms/${mp.roomCode}`).remove();
+    }
     updateMenuUI();
     showScreen('menu');
   });
