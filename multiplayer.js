@@ -920,12 +920,11 @@ function mpShowCountdown(label, callback) {
   }, 1000);
 }
 
-// ── FEEDBACK ──────────────────────────────────────────────────────────────────
+// ── FEEDBACK (REST API — sem SDK, sem cache) ───────────────────────────────────
+const FB_REST = 'https://quadrablast-default-rtdb.firebaseio.com';
 let fbSelectedStars = 0;
-let fbListenerRef   = null;
 
 function fbOpen() {
-  if (!checkFirebase()) return;
   fbSelectedStars = 0;
   $('fb-name').value = '';
   $('fb-text').value = '';
@@ -934,22 +933,27 @@ function fbOpen() {
   $('fb-list').innerHTML = '<div class="mp-no-players">Carregando...</div>';
   fbSetStars(0);
   showScreen('feedback');
-
-  // Listener em tempo real — atualiza a lista automaticamente
-  fbListenerRef = mp.db.ref('feedback');
-  fbListenerRef.on('value', snap => {
-    const items = [];
-    snap.forEach(child => items.push(child.val()));
-    items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    fbRenderList(items);
-  }, err => {
-    $('fb-list').innerHTML = `<div class="mp-no-players">Erro ao carregar: ${escHtml(err.message)}<br><small>Verifique as regras do Firebase Realtime Database.</small></div>`;
-  });
+  fbLoad();
 }
 
 function fbClose() {
-  if (fbListenerRef) { fbListenerRef.off(); fbListenerRef = null; }
   showScreen('menu');
+}
+
+async function fbLoad() {
+  try {
+    const resp = await fetch(`${FB_REST}/feedback.json`);
+    if (!resp.ok) {
+      const msg = await resp.text();
+      throw new Error(`HTTP ${resp.status}: ${msg}`);
+    }
+    const data  = await resp.json();
+    const items = data ? Object.values(data).filter(Boolean) : [];
+    items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    fbRenderList(items);
+  } catch (e) {
+    $('fb-list').innerHTML = `<div class="mp-no-players">Erro ao carregar: ${escHtml(e.message)}<br><small>Verifique as regras do Firebase (precisa de .read: true para "feedback").</small></div>`;
+  }
 }
 
 function fbSetStars(n) {
@@ -1001,20 +1005,24 @@ async function fbSubmit() {
   btn.textContent = 'Enviando...';
   $('fb-error').classList.add('hidden');
   try {
-    const newRef = mp.db.ref('feedback').push();
-    await newRef.set({ name, stars: fbSelectedStars, text, timestamp: Date.now() });
-    const verify = await newRef.once('value');
-    if (!verify.exists()) {
-      throw new Error('Permissão negada. Nas regras do Firebase Realtime Database adicione ".read": true e ".write": true para o caminho "feedback".');
+    const resp = await fetch(`${FB_REST}/feedback.json`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, stars: fbSelectedStars, text, timestamp: Date.now() }),
+    });
+    if (!resp.ok) {
+      const msg = await resp.text();
+      throw new Error(`HTTP ${resp.status}: ${msg} — verifique as regras do Firebase`);
     }
     $('fb-name').value = '';
     $('fb-text').value = '';
     fbSetStars(0);
     btn.textContent = '✓ Enviado!';
     setTimeout(() => { btn.disabled = false; btn.textContent = 'Enviar ✓'; }, 2000);
+    fbLoad();
   } catch (e) {
     const err = $('fb-error');
-    err.textContent = `Erro: ${e.message || 'tente novamente.'}`;
+    err.textContent = `Erro: ${e.message}`;
     err.classList.remove('hidden');
     btn.disabled    = false;
     btn.textContent = 'Enviar ✓';
