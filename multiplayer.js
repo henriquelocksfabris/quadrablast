@@ -28,6 +28,7 @@ const mp = {
   currentQIdx: 0,
   lastRenderedQIdx: -1,
   qResultShown: false,
+  qAdvanced: false,
   currentQ: null,
   qStartedAt: 0,
   qTimer: null,
@@ -355,6 +356,8 @@ async function mpHostStartNextQuestion() {
   const q = mpGenerateMultiplayerQ(mp.config.difficulty);
   q.index = mp.currentQIdx;
 
+  mp.qAdvanced = false;
+
   const qData = {
     index:        q.index,
     type:         q.eq.type,
@@ -384,7 +387,7 @@ function mpHostShowQuestion(q) {
     if (remaining <= 0) {
       clearInterval(mp.qTimer);
       mpUpdateHostQTimer(0, q.timeLimit);
-      mpHostAdvanceQuestion();
+      if (!mp.qAdvanced) { mp.qAdvanced = true; mpHostAdvanceQuestion(); }
     } else {
       mpUpdateHostQTimer(remaining, q.timeLimit);
     }
@@ -438,7 +441,11 @@ async function mpHostAdvanceQuestion() {
 
   await mpRoomRef().update(updates);
 
+  // Host vê o placar junto com os jogadores
+  mpShowQResult(updates['qResult']);
+
   setTimeout(async () => {
+    showScreen('mpHost');
     mp.currentQIdx++;
     if (Date.now() >= mp.roundEndsAt) {
       await mpHostEndRound();
@@ -625,8 +632,16 @@ function mpUpdateLiveBoard(players) {
   const sorted  = Object.values(players).sort((a, b) => (b.score||0) - (a.score||0));
   const isTeams = mp.config.mode === 'teams';
   const qIdx    = mp.currentQIdx;
+  const total    = sorted.length;
   const answered = sorted.filter(p => p.answers?.[qIdx]).length;
-  $('mp-host-answers-count').textContent = `${answered} / ${sorted.length} responderam`;
+  $('mp-host-answers-count').textContent = `${answered} / ${total} responderam`;
+
+  if (total > 0 && answered >= total && !mp.qAdvanced) {
+    mp.qAdvanced = true;
+    clearInterval(mp.qTimer);
+    mpUpdateHostQTimer(0, 1);
+    setTimeout(mpHostAdvanceQuestion, 800);
+  }
 
   $('mp-live-board').innerHTML = sorted.slice(0, 8).map((p, i) => `
     <div class="mp-live-item">
@@ -729,6 +744,17 @@ function mpSetupEvents() {
   $('btn-mp-join-room').addEventListener('click', mpJoinRoom);
   $('btn-mp-join-back').addEventListener('click', () => showScreen('menu'));
   $('mp-join-code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+
+  // Host in-game controls
+  $('btn-mp-host-skip').addEventListener('click', () => {
+    if (!mp.qAdvanced) { mp.qAdvanced = true; clearInterval(mp.qTimer); mpHostAdvanceQuestion(); }
+  });
+  $('btn-mp-host-end').addEventListener('click', async () => {
+    clearInterval(mp.qTimer);
+    clearInterval(mp.roundTimer);
+    mp.qAdvanced = true;
+    await mpHostEndGame();
+  });
 
   // Lobby
   $('btn-mp-start-game').addEventListener('click', mpHostStartGame);
