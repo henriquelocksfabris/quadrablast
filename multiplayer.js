@@ -133,13 +133,15 @@ function mpInit() {
 
 // ── SCREEN REGISTRATION ───────────────────────────────────────────────────────
 function mpRegisterScreens() {
-  screens.mpCreate  = $('screen-mp-create');
-  screens.mpJoin    = $('screen-mp-join');
-  screens.mpLobby   = $('screen-mp-lobby');
-  screens.mpHost    = $('screen-mp-host');
-  screens.mpGame    = $('screen-mp-game');
-  screens.mpQResult = $('screen-mp-q-result');
-  screens.mpPodium  = $('screen-mp-podium');
+  screens.mpCreate    = $('screen-mp-create');
+  screens.mpJoin      = $('screen-mp-join');
+  screens.mpLobby     = $('screen-mp-lobby');
+  screens.mpCountdown = $('screen-mp-countdown');
+  screens.mpHost      = $('screen-mp-host');
+  screens.mpGame      = $('screen-mp-game');
+  screens.mpQResult   = $('screen-mp-q-result');
+  screens.mpPodium    = $('screen-mp-podium');
+  screens.feedback    = $('screen-feedback');
 }
 
 // ── ROOM CREATION ─────────────────────────────────────────────────────────────
@@ -286,9 +288,8 @@ function mpEnterLobby(isHost) {
 
   if (!isHost) {
     mpAddListener(mpRoomRef('status'), 'value', snap => {
-      if (snap.val() === 'playing') {
+      if (snap.val() === 'countdown') {
         mpDetachListeners();
-        showScreen('mpGame');
         mpAttachGameListeners();
       }
     });
@@ -325,10 +326,8 @@ function mpSelectTeam(team) {
 
 // ── HOST GAME FLOW ────────────────────────────────────────────────────────────
 async function mpHostStartGame() {
-  await mpRoomRef().update({ status: 'playing' });
-
-  mp.currentRound = 1;
-  mp.currentQIdx  = 0;
+  mp.currentRound     = 1;
+  mp.currentQIdx      = 0;
   mp.lastRenderedQIdx = -1;
 
   $('mp-host-code').textContent = mp.roomCode;
@@ -338,8 +337,11 @@ async function mpHostStartGame() {
     mpUpdateLiveBoard(snap.val() || {});
   });
 
-  showScreen('mpHost');
-  mpHostStartRound();
+  await mpRoomRef().update({ status: 'countdown' });
+  mpShowCountdown(`Rodada ${mp.currentRound}`, () => {
+    showScreen('mpHost');
+    mpHostStartRound();
+  });
 }
 
 function mpHostStartRound() {
@@ -493,7 +495,13 @@ async function mpHostEndRound() {
   });
   await mpRoomRef().update(updates);
 
-  setTimeout(() => mpHostStartRound(), 5000);
+  setTimeout(async () => {
+    await mpRoomRef().update({ status: 'countdown' });
+    mpShowCountdown(`Rodada ${mp.currentRound}`, () => {
+      showScreen('mpHost');
+      mpHostStartRound();
+    });
+  }, 1500);
 }
 
 async function mpHostEndGame() {
@@ -532,13 +540,25 @@ function mpAttachGameListeners() {
 
   mpAddListener(mpRoomRef('status'), 'value', snap => {
     const status = snap.val();
-    if (status === 'round-end') {
+    if (status === 'countdown') {
+      clearInterval(mp.qTimer);
+      mpShowCountdown(`Rodada ${mp.currentRound}`, () => {
+        $('mp-game-waiting').textContent = 'Carregando questão...';
+        $('mp-game-waiting').style.color = '';
+        $('mp-game-waiting').classList.remove('hidden');
+        showScreen('mpGame');
+      });
+    } else if (status === 'round-end') {
       clearInterval(mp.qTimer);
       mp.currentRound++;
       mp.lastRenderedQIdx = -1;
       mp.qResultShown     = false;
       mp.answered         = false;
       $('mp-game-round').textContent = `Rodada ${mp.currentRound}`;
+      showScreen('mpGame');
+      $('mp-game-waiting').textContent = 'Fim da rodada! Aguardando próxima...';
+      $('mp-game-waiting').style.color = '';
+      $('mp-game-waiting').classList.remove('hidden');
     } else if (status === 'finished') {
       clearInterval(mp.qTimer);
       mpRoomRef().once('value', s => mpShowPodium(s.val()));
@@ -754,6 +774,19 @@ function mpSetupEvents() {
   $('btn-mp-create').addEventListener('click', mpOpenCreate);
   $('btn-mp-join').addEventListener('click', mpOpenJoin);
 
+  // Feedback
+  $('btn-feedback').addEventListener('click', fbOpen);
+  $('btn-feedback-back').addEventListener('click', () => showScreen('menu'));
+  $('btn-fb-submit').addEventListener('click', fbSubmit);
+  document.querySelectorAll('.fb-star').forEach(el => {
+    el.addEventListener('click', () => fbSetStars(parseInt(el.dataset.val, 10)));
+    el.addEventListener('mouseenter', () => {
+      const n = parseInt(el.dataset.val, 10);
+      document.querySelectorAll('.fb-star').forEach((s, i) => s.classList.toggle('active', i < n));
+    });
+  });
+  $('fb-stars-row').addEventListener('mouseleave', () => fbSetStars(fbSelectedStars));
+
   // Toggle groups
   ['mp-mode-toggle', 'mp-diff-toggle', 'mp-round-type-toggle'].forEach(groupId => {
     document.querySelectorAll(`#${groupId} .mp-toggle`).forEach(btn => {
@@ -856,6 +889,129 @@ function mpSetupEvents() {
     updateMenuUI();
     showScreen('menu');
   });
+}
+
+// ── COUNTDOWN ─────────────────────────────────────────────────────────────────
+function mpShowCountdown(label, callback) {
+  $('mp-countdown-label').textContent = label;
+  let n = 3;
+  const numEl = $('mp-countdown-num');
+  numEl.textContent = n;
+  numEl.classList.remove('mp-cd-pop');
+  void numEl.offsetWidth;
+  numEl.classList.add('mp-cd-pop');
+  showScreen('mpCountdown');
+
+  const tick = setInterval(() => {
+    n--;
+    if (n <= 0) {
+      clearInterval(tick);
+      numEl.classList.remove('mp-cd-pop');
+      void numEl.offsetWidth;
+      numEl.classList.add('mp-cd-pop');
+      numEl.textContent = '🚀';
+      setTimeout(callback, 600);
+    } else {
+      numEl.classList.remove('mp-cd-pop');
+      void numEl.offsetWidth;
+      numEl.classList.add('mp-cd-pop');
+      numEl.textContent = n;
+    }
+  }, 1000);
+}
+
+// ── FEEDBACK ──────────────────────────────────────────────────────────────────
+let fbSelectedStars = 0;
+
+function fbOpen() {
+  if (!checkFirebase()) return;
+  fbSelectedStars = 0;
+  $('fb-name').value  = '';
+  $('fb-text').value  = '';
+  $('fb-error').classList.add('hidden');
+  fbSetStars(0);
+  showScreen('feedback');
+  fbLoadFeedback();
+}
+
+function fbSetStars(n) {
+  fbSelectedStars = n;
+  document.querySelectorAll('.fb-star').forEach((el, i) => {
+    el.classList.toggle('active', i < n);
+  });
+}
+
+async function fbLoadFeedback() {
+  const list = $('fb-list');
+  list.innerHTML = '<div class="mp-no-players">Carregando...</div>';
+  try {
+    const snap = await mp.db.ref('feedback').orderByChild('timestamp').limitToLast(30).once('value');
+    const items = [];
+    snap.forEach(child => items.unshift(child.val()));
+
+    if (items.length === 0) {
+      $('fb-avg-row').classList.add('hidden');
+      list.innerHTML = '<div class="mp-no-players">Nenhum feedback ainda. Seja o primeiro!</div>';
+      return;
+    }
+
+    const avg = items.reduce((s, f) => s + (f.stars || 0), 0) / items.length;
+    $('fb-avg-stars').textContent = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
+    $('fb-avg-num').textContent   = avg.toFixed(1);
+    $('fb-avg-count').textContent = `(${items.length} avaliação${items.length !== 1 ? 'ões' : ''})`;
+    $('fb-avg-row').classList.remove('hidden');
+
+    list.innerHTML = items.map(f => `
+      <div class="fb-item">
+        <div class="fb-item-top">
+          <span class="fb-item-stars">${'★'.repeat(f.stars || 0)}${'☆'.repeat(5 - (f.stars || 0))}</span>
+          <span class="fb-item-name">${escHtml(f.name || 'Anônimo')}</span>
+          <span class="fb-item-date">${fbFormatDate(f.timestamp)}</span>
+        </div>
+        ${f.text ? `<div class="fb-item-text">${escHtml(f.text)}</div>` : ''}
+      </div>
+    `).join('');
+  } catch {
+    list.innerHTML = '<div class="mp-no-players">Erro ao carregar feedbacks.</div>';
+  }
+}
+
+async function fbSubmit() {
+  if (fbSelectedStars === 0) {
+    const err = $('fb-error');
+    err.textContent = 'Selecione uma nota de 1 a 5 estrelas!';
+    err.classList.remove('hidden');
+    return;
+  }
+
+  const name = $('fb-name').value.trim().slice(0, 30);
+  const text = $('fb-text').value.trim().slice(0, 200);
+  const btn  = $('btn-fb-submit');
+
+  btn.disabled    = true;
+  btn.textContent = 'Enviando...';
+  $('fb-error').classList.add('hidden');
+
+  try {
+    await mp.db.ref('feedback').push({ name, stars: fbSelectedStars, text, timestamp: Date.now() });
+    $('fb-name').value = '';
+    $('fb-text').value = '';
+    fbSetStars(0);
+    btn.textContent = '✓ Enviado!';
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Enviar ✓'; }, 2000);
+    fbLoadFeedback();
+  } catch {
+    const err = $('fb-error');
+    err.textContent = 'Erro ao enviar. Tente novamente.';
+    err.classList.remove('hidden');
+    btn.disabled    = false;
+    btn.textContent = 'Enviar ✓';
+  }
+}
+
+function fbFormatDate(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────

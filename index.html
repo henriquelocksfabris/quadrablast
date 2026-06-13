@@ -59,7 +59,7 @@
       </div>
     </div>
     <button id="btn-credits" class="btn-credits-corner">Créditos</button>
-    <div class="author-credit">Henrique Locks</div>
+    <button id="btn-feedback" class="btn-feedback-corner">⭐ Feedback</button>
   </div>
 
   <!-- CRÉDITOS -->
@@ -331,6 +331,14 @@
     </div>
   </div>
 
+  <!-- MULTIPLAYER: COUNTDOWN -->
+  <div id="screen-mp-countdown" class="screen">
+    <div class="mp-countdown-wrap">
+      <div class="mp-countdown-label" id="mp-countdown-label">Rodada 1</div>
+      <div class="mp-countdown-num mp-cd-pop" id="mp-countdown-num">3</div>
+    </div>
+  </div>
+
   <!-- MULTIPLAYER: HOST (tela durante o jogo) -->
   <div id="screen-mp-host" class="screen">
     <div class="mp-host-wrap">
@@ -403,6 +411,35 @@
       <div id="mp-podium" class="mp-podium"></div>
       <div id="mp-full-board" class="mp-full-board"></div>
       <button id="btn-mp-podium-menu" class="btn-secondary" style="width:100%">← Menu</button>
+    </div>
+  </div>
+
+  <!-- FEEDBACK -->
+  <div id="screen-feedback" class="screen">
+    <div class="fb-wrap">
+      <div class="fb-title">⭐ Feedback</div>
+      <div class="fb-avg-row hidden" id="fb-avg-row">
+        <span class="fb-avg-stars" id="fb-avg-stars">★★★★★</span>
+        <span class="fb-avg-num" id="fb-avg-num">0.0</span>
+        <span class="fb-avg-count" id="fb-avg-count">(0)</span>
+      </div>
+      <div class="fb-form">
+        <input id="fb-name" type="text" placeholder="Seu nome (opcional)" class="inf-start-input" maxlength="30">
+        <div class="fb-stars-row" id="fb-stars-row">
+          <span class="fb-star" data-val="1">★</span>
+          <span class="fb-star" data-val="2">★</span>
+          <span class="fb-star" data-val="3">★</span>
+          <span class="fb-star" data-val="4">★</span>
+          <span class="fb-star" data-val="5">★</span>
+        </div>
+        <textarea id="fb-text" class="fb-textarea" placeholder="Seu comentário..." maxlength="200" rows="3"></textarea>
+        <div class="fb-form-bottom">
+          <span id="fb-error" class="mp-error hidden" style="font-size:0.78rem;padding:6px 10px"></span>
+          <button id="btn-fb-submit" class="btn-primary" style="width:100%">Enviar ✓</button>
+        </div>
+      </div>
+      <div class="fb-list" id="fb-list"><div class="mp-no-players">Carregando...</div></div>
+      <button id="btn-feedback-back" class="btn-back-link">← Menu</button>
     </div>
   </div>
 
