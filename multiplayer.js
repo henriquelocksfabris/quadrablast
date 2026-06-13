@@ -776,7 +776,7 @@ function mpSetupEvents() {
 
   // Feedback
   $('btn-feedback').addEventListener('click', fbOpen);
-  $('btn-feedback-back').addEventListener('click', () => showScreen('menu'));
+  $('btn-feedback-back').addEventListener('click', fbClose);
   $('btn-fb-submit').addEventListener('click', fbSubmit);
   document.querySelectorAll('.fb-star').forEach(el => {
     el.addEventListener('click', () => fbSetStars(parseInt(el.dataset.val, 10)));
@@ -922,16 +922,34 @@ function mpShowCountdown(label, callback) {
 
 // ── FEEDBACK ──────────────────────────────────────────────────────────────────
 let fbSelectedStars = 0;
+let fbListenerRef   = null;
 
 function fbOpen() {
   if (!checkFirebase()) return;
   fbSelectedStars = 0;
-  $('fb-name').value  = '';
-  $('fb-text').value  = '';
+  $('fb-name').value = '';
+  $('fb-text').value = '';
   $('fb-error').classList.add('hidden');
+  $('fb-avg-row').classList.add('hidden');
+  $('fb-list').innerHTML = '<div class="mp-no-players">Carregando...</div>';
   fbSetStars(0);
   showScreen('feedback');
-  fbLoadFeedback();
+
+  // Listener em tempo real — atualiza a lista automaticamente
+  fbListenerRef = mp.db.ref('feedback');
+  fbListenerRef.on('value', snap => {
+    const items = [];
+    snap.forEach(child => items.push(child.val()));
+    items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    fbRenderList(items);
+  }, () => {
+    $('fb-list').innerHTML = '<div class="mp-no-players">Erro ao carregar feedbacks.</div>';
+  });
+}
+
+function fbClose() {
+  if (fbListenerRef) { fbListenerRef.off(); fbListenerRef = null; }
+  showScreen('menu');
 }
 
 function fbSetStars(n) {
@@ -941,40 +959,27 @@ function fbSetStars(n) {
   });
 }
 
-async function fbLoadFeedback() {
-  const list = $('fb-list');
-  list.innerHTML = '<div class="mp-no-players">Carregando...</div>';
-  try {
-    const snap = await mp.db.ref('feedback').limitToLast(50).once('value');
-    const items = [];
-    snap.forEach(child => items.push(child.val()));
-    items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-    if (items.length === 0) {
-      $('fb-avg-row').classList.add('hidden');
-      list.innerHTML = '<div class="mp-no-players">Nenhum feedback ainda. Seja o primeiro!</div>';
-      return;
-    }
-
-    const avg = items.reduce((s, f) => s + (f.stars || 0), 0) / items.length;
-    $('fb-avg-stars').textContent = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
-    $('fb-avg-num').textContent   = avg.toFixed(1);
-    $('fb-avg-count').textContent = `(${items.length} avaliação${items.length !== 1 ? 'ões' : ''})`;
-    $('fb-avg-row').classList.remove('hidden');
-
-    list.innerHTML = items.map(f => `
-      <div class="fb-item">
-        <div class="fb-item-top">
-          <span class="fb-item-stars">${'★'.repeat(f.stars || 0)}${'☆'.repeat(5 - (f.stars || 0))}</span>
-          <span class="fb-item-name">${escHtml(f.name || 'Anônimo')}</span>
-          <span class="fb-item-date">${fbFormatDate(f.timestamp)}</span>
-        </div>
-        ${f.text ? `<div class="fb-item-text">${escHtml(f.text)}</div>` : ''}
-      </div>
-    `).join('');
-  } catch {
-    list.innerHTML = '<div class="mp-no-players">Erro ao carregar feedbacks.</div>';
+function fbRenderList(items) {
+  if (items.length === 0) {
+    $('fb-avg-row').classList.add('hidden');
+    $('fb-list').innerHTML = '<div class="mp-no-players">Nenhum feedback ainda. Seja o primeiro!</div>';
+    return;
   }
+  const avg = items.reduce((s, f) => s + (f.stars || 0), 0) / items.length;
+  $('fb-avg-stars').textContent = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
+  $('fb-avg-num').textContent   = avg.toFixed(1);
+  $('fb-avg-count').textContent = `(${items.length} avaliação${items.length !== 1 ? 'ões' : ''})`;
+  $('fb-avg-row').classList.remove('hidden');
+  $('fb-list').innerHTML = items.map(f => `
+    <div class="fb-item">
+      <div class="fb-item-top">
+        <span class="fb-item-stars">${'★'.repeat(f.stars || 0)}${'☆'.repeat(5 - (f.stars || 0))}</span>
+        <span class="fb-item-name">${escHtml(f.name || 'Anônimo')}</span>
+        <span class="fb-item-date">${fbFormatDate(f.timestamp)}</span>
+      </div>
+      ${f.text ? `<div class="fb-item-text">${escHtml(f.text)}</div>` : ''}
+    </div>
+  `).join('');
 }
 
 async function fbSubmit() {
@@ -984,15 +989,12 @@ async function fbSubmit() {
     err.classList.remove('hidden');
     return;
   }
-
   const name = $('fb-name').value.trim().slice(0, 30);
   const text = $('fb-text').value.trim().slice(0, 200);
   const btn  = $('btn-fb-submit');
-
   btn.disabled    = true;
   btn.textContent = 'Enviando...';
   $('fb-error').classList.add('hidden');
-
   try {
     await mp.db.ref('feedback').push({ name, stars: fbSelectedStars, text, timestamp: Date.now() });
     $('fb-name').value = '';
@@ -1000,10 +1002,10 @@ async function fbSubmit() {
     fbSetStars(0);
     btn.textContent = '✓ Enviado!';
     setTimeout(() => { btn.disabled = false; btn.textContent = 'Enviar ✓'; }, 2000);
-    fbLoadFeedback();
-  } catch {
+    // a lista atualiza automaticamente via o listener on('value')
+  } catch (e) {
     const err = $('fb-error');
-    err.textContent = 'Erro ao enviar. Tente novamente.';
+    err.textContent = `Erro ao enviar: ${e.message || 'tente novamente.'}`;
     err.classList.remove('hidden');
     btn.disabled    = false;
     btn.textContent = 'Enviar ✓';
