@@ -1098,10 +1098,12 @@ body.inferno .progress-bar {
 }
 
 /* Feedback screen */
+#screen-feedback { justify-content: flex-start; overflow-y: auto; }
+
 .fb-wrap {
-  width: 100%; max-width: 440px; height: 100%;
+  width: 100%; max-width: 440px;
   display: flex; flex-direction: column; gap: 14px;
-  overflow-y: auto; padding: 20px 0;
+  padding: 20px 0;
 }
 .fb-title { font-size: 1.6rem; font-weight: 900; text-align: center; }
 .fb-avg-row {

@@ -945,9 +945,10 @@ async function fbLoadFeedback() {
   const list = $('fb-list');
   list.innerHTML = '<div class="mp-no-players">Carregando...</div>';
   try {
-    const snap = await mp.db.ref('feedback').orderByChild('timestamp').limitToLast(30).once('value');
+    const snap = await mp.db.ref('feedback').limitToLast(50).once('value');
     const items = [];
-    snap.forEach(child => items.unshift(child.val()));
+    snap.forEach(child => items.push(child.val()));
+    items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     if (items.length === 0) {
       $('fb-avg-row').classList.add('hidden');
