@@ -52,7 +52,7 @@ function mpGenerateCode() {
 }
 
 function mpGeneratePlayerId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
 }
 
 function mpFormatTime(ms) {
@@ -166,9 +166,12 @@ async function mpCreateRoom() {
   mp.isHost     = true;
   mp.playerName = null;
   mp.config = {
-    mode:       mpGetToggleVal('mp-mode-toggle'),
-    difficulty: mpGetToggleVal('mp-diff-toggle'),
-    rounds:     parseInt($('mp-rounds-val').textContent, 10),
+    mode:           mpGetToggleVal('mp-mode-toggle'),
+    difficulty:     mpGetToggleVal('mp-diff-toggle'),
+    rounds:         parseInt($('mp-rounds-val').textContent, 10),
+    roundType:      mpGetToggleVal('mp-round-type-toggle') || 'time',
+    roundDuration:  parseInt($('mp-duration-val').textContent, 10) || 5,
+    roundQuestions: parseInt($('mp-qcount-val').textContent, 10) || 10,
   };
   mp.totalRounds   = mp.config.rounds;
   mp.currentRound  = 1;
@@ -233,9 +236,9 @@ async function mpJoinRoom() {
     mp.currentRound = 1;
     mp.score        = 0;
 
-    await mp.db.ref(`rooms/${code}/players/${mp.playerId}`).set({
-      name, team: 'A', score: 0, roundScore: 0, online: true,
-    });
+    const playerRef = mp.db.ref(`rooms/${code}/players/${mp.playerId}`);
+    await playerRef.set({ name, team: 'A', score: 0, roundScore: 0, online: true });
+    playerRef.onDisconnect().remove();
 
     mpEnterLobby(false);
   } catch (e) {
@@ -258,7 +261,10 @@ function mpEnterLobby(isHost) {
 
   const modeLabel = { individual: '👤 Individual', teams: '⚔️ Equipes' }[mp.config.mode] || '';
   const diffLabel = { easy: '🌱 Fácil', medium: '⚡ Médio', hard: '💀 Difícil', mixed: '🎲 Misto' }[mp.config.difficulty] || '';
-  $('mp-lobby-config').textContent = `${modeLabel} · ${diffLabel} · ${mp.totalRounds} rodada${mp.totalRounds !== 1 ? 's' : ''}`;
+  const roundInfo = (mp.config.roundType || 'time') === 'questions'
+    ? `${mp.config.roundQuestions} questões/rodada`
+    : `${mp.config.roundDuration || 5} min/rodada`;
+  $('mp-lobby-config').textContent = `${modeLabel} · ${diffLabel} · ${mp.totalRounds} rodada${mp.totalRounds !== 1 ? 's' : ''} · ${roundInfo}`;
 
   const showTeam = !isHost && mp.config.mode === 'teams';
   $('mp-team-select').classList.toggle('hidden', !showTeam);
@@ -337,17 +343,25 @@ async function mpHostStartGame() {
 }
 
 function mpHostStartRound() {
-  mp.roundEndsAt = Date.now() + 5 * 60 * 1000;
   mp.currentQIdx = 0;
-
   $('mp-host-round').textContent = `Rodada ${mp.currentRound}/${mp.totalRounds}`;
-
   clearInterval(mp.roundTimer);
-  mp.roundTimer = setInterval(() => {
-    const rem = mp.roundEndsAt - Date.now();
-    $('mp-host-timer').textContent = mpFormatTime(Math.max(0, rem));
-    if (rem <= 0) clearInterval(mp.roundTimer);
-  }, 500);
+
+  if ((mp.config.roundType || 'time') === 'questions') {
+    mp.roundEndsAt = Infinity;
+    $('mp-host-timer').textContent = `Q 0/${mp.config.roundQuestions}`;
+    mp.roundTimer = setInterval(() => {
+      $('mp-host-timer').textContent = `Q ${mp.currentQIdx}/${mp.config.roundQuestions}`;
+    }, 500);
+  } else {
+    const mins = mp.config.roundDuration || 5;
+    mp.roundEndsAt = Date.now() + mins * 60 * 1000;
+    mp.roundTimer = setInterval(() => {
+      const rem = mp.roundEndsAt - Date.now();
+      $('mp-host-timer').textContent = mpFormatTime(Math.max(0, rem));
+      if (rem <= 0) clearInterval(mp.roundTimer);
+    }, 500);
+  }
 
   mpHostStartNextQuestion();
 }
@@ -447,7 +461,11 @@ async function mpHostAdvanceQuestion() {
   setTimeout(async () => {
     showScreen('mpHost');
     mp.currentQIdx++;
-    if (Date.now() >= mp.roundEndsAt) {
+    const isQuestionMode = (mp.config.roundType || 'time') === 'questions';
+    const shouldEndRound = isQuestionMode
+      ? mp.currentQIdx >= mp.config.roundQuestions
+      : Date.now() >= mp.roundEndsAt;
+    if (shouldEndRound) {
       await mpHostEndRound();
     } else {
       await mpHostStartNextQuestion();
@@ -475,6 +493,14 @@ async function mpHostEndRound() {
   await mpRoomRef().update(updates);
 
   setTimeout(() => mpHostStartRound(), 5000);
+}
+
+async function mpHostEndGame() {
+  clearInterval(mp.qTimer);
+  clearInterval(mp.roundTimer);
+  await mpRoomRef().update({ status: 'finished' });
+  const snap = await mpRoomRef().once('value');
+  mpShowPodium(snap.val());
 }
 
 // ── PLAYER GAME FLOW ──────────────────────────────────────────────────────────
@@ -599,10 +625,17 @@ function mpShowQResult(qr) {
   const isCorrect = myResult?.correct || false;
   const points    = myResult?.points  || 0;
 
-  $('mp-q-result-icon').textContent  = isCorrect ? '✓' : '✗';
-  $('mp-q-result-icon').style.color  = isCorrect ? 'var(--green)' : 'var(--red)';
-  $('mp-q-result-label').textContent = isCorrect ? 'Correto!' : (myResult ? 'Errou!' : 'Sem resposta');
-  $('mp-q-result-points').textContent = isCorrect ? `+${points} pts` : '+0 pts';
+  if (mp.isHost) {
+    $('mp-q-result-icon').textContent = '📊';
+    $('mp-q-result-icon').style.color = 'var(--purple-light)';
+    $('mp-q-result-label').textContent = 'Placar da Questão';
+    $('mp-q-result-points').textContent = '';
+  } else {
+    $('mp-q-result-icon').textContent  = isCorrect ? '✓' : '✗';
+    $('mp-q-result-icon').style.color  = isCorrect ? 'var(--green)' : 'var(--red)';
+    $('mp-q-result-label').textContent = isCorrect ? 'Correto!' : (myResult ? 'Errou!' : 'Sem resposta');
+    $('mp-q-result-points').textContent = isCorrect ? `+${points} pts` : '+0 pts';
+  }
   $('mp-q-result-answer').textContent = `Resposta: ${qr.correctLabel}`;
 
   const sorted = Object.values(qr.players || {}).sort((a, b) => (b.totalScore||0) - (a.totalScore||0));
@@ -718,11 +751,15 @@ function mpSetupEvents() {
   $('btn-mp-join').addEventListener('click', mpOpenJoin);
 
   // Toggle groups
-  ['mp-mode-toggle', 'mp-diff-toggle'].forEach(groupId => {
+  ['mp-mode-toggle', 'mp-diff-toggle', 'mp-round-type-toggle'].forEach(groupId => {
     document.querySelectorAll(`#${groupId} .mp-toggle`).forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll(`#${groupId} .mp-toggle`).forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        if (groupId === 'mp-round-type-toggle') {
+          $('mp-time-config').classList.toggle('hidden', btn.dataset.val !== 'time');
+          $('mp-questions-config').classList.toggle('hidden', btn.dataset.val !== 'questions');
+        }
       });
     });
   });
@@ -735,6 +772,26 @@ function mpSetupEvents() {
   $('mp-rounds-inc').addEventListener('click', () => {
     const v = parseInt($('mp-rounds-val').textContent, 10);
     if (v < 10) $('mp-rounds-val').textContent = v + 1;
+  });
+
+  // Duration counter (minutes per round)
+  $('mp-duration-dec').addEventListener('click', () => {
+    const v = parseInt($('mp-duration-val').textContent, 10);
+    if (v > 1) $('mp-duration-val').textContent = v - 1;
+  });
+  $('mp-duration-inc').addEventListener('click', () => {
+    const v = parseInt($('mp-duration-val').textContent, 10);
+    if (v < 30) $('mp-duration-val').textContent = v + 1;
+  });
+
+  // Question count counter
+  $('mp-qcount-dec').addEventListener('click', () => {
+    const v = parseInt($('mp-qcount-val').textContent, 10);
+    if (v > 5) $('mp-qcount-val').textContent = v - 5;
+  });
+  $('mp-qcount-inc').addEventListener('click', () => {
+    const v = parseInt($('mp-qcount-val').textContent, 10);
+    if (v < 50) $('mp-qcount-val').textContent = v + 5;
   });
 
   $('btn-mp-create-room').addEventListener('click', mpCreateRoom);
@@ -754,6 +811,19 @@ function mpSetupEvents() {
     clearInterval(mp.roundTimer);
     mp.qAdvanced = true;
     await mpHostEndGame();
+  });
+
+  // Player: leave game mid-match
+  $('btn-mp-game-leave').addEventListener('click', () => {
+    mpDetachListeners();
+    clearInterval(mp.qTimer);
+    if (mp.roomCode && mp.playerId && !mp.isHost) {
+      const playerRef = mp.db.ref(`rooms/${mp.roomCode}/players/${mp.playerId}`);
+      playerRef.onDisconnect().cancel();
+      playerRef.remove();
+    }
+    updateMenuUI();
+    showScreen('menu');
   });
 
   // Lobby

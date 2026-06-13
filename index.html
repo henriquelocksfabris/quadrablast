@@ -266,6 +266,27 @@
           <span id="mp-rounds-val" class="mp-rounds-display">3</span>
           <button id="mp-rounds-inc" class="mp-round-btn">+</button>
         </div>
+        <div class="mp-field-label">Tipo de rodada</div>
+        <div class="mp-toggle-row" id="mp-round-type-toggle">
+          <button class="mp-toggle active" data-val="time">⏱ Por Tempo</button>
+          <button class="mp-toggle" data-val="questions">🎯 Por Questões</button>
+        </div>
+        <div id="mp-time-config">
+          <div class="mp-field-label">Minutos por rodada</div>
+          <div class="mp-rounds-row">
+            <button id="mp-duration-dec" class="mp-round-btn">−</button>
+            <span id="mp-duration-val" class="mp-rounds-display">5</span>
+            <button id="mp-duration-inc" class="mp-round-btn">+</button>
+          </div>
+        </div>
+        <div id="mp-questions-config" class="hidden">
+          <div class="mp-field-label">Questões por rodada</div>
+          <div class="mp-rounds-row">
+            <button id="mp-qcount-dec" class="mp-round-btn">−</button>
+            <span id="mp-qcount-val" class="mp-rounds-display">10</span>
+            <button id="mp-qcount-inc" class="mp-round-btn">+</button>
+          </div>
+        </div>
         <button id="btn-mp-create-room" class="btn-primary" style="width:100%">Criar Sala →</button>
       </div>
       <button id="btn-mp-create-back" class="btn-back-link">← Menu</button>
@@ -339,6 +360,7 @@
 
   <!-- MULTIPLAYER: JOGO (jogador) -->
   <div id="screen-mp-game" class="screen">
+    <button id="btn-mp-game-leave" class="btn-game-back">← Sair</button>
     <div class="mp-game-topbar">
       <div class="mp-game-name" id="mp-game-player-name">Jogador</div>
       <div class="score-display">
