@@ -942,8 +942,8 @@ function fbOpen() {
     snap.forEach(child => items.push(child.val()));
     items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     fbRenderList(items);
-  }, () => {
-    $('fb-list').innerHTML = '<div class="mp-no-players">Erro ao carregar feedbacks.</div>';
+  }, err => {
+    $('fb-list').innerHTML = `<div class="mp-no-players">Erro ao carregar: ${escHtml(err.message)}<br><small>Verifique as regras do Firebase Realtime Database.</small></div>`;
   });
 }
 
@@ -960,26 +960,31 @@ function fbSetStars(n) {
 }
 
 function fbRenderList(items) {
-  if (items.length === 0) {
-    $('fb-avg-row').classList.add('hidden');
-    $('fb-list').innerHTML = '<div class="mp-no-players">Nenhum feedback ainda. Seja o primeiro!</div>';
-    return;
-  }
-  const avg = items.reduce((s, f) => s + (f.stars || 0), 0) / items.length;
-  $('fb-avg-stars').textContent = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
-  $('fb-avg-num').textContent   = avg.toFixed(1);
-  $('fb-avg-count').textContent = `(${items.length} avaliação${items.length !== 1 ? 'ões' : ''})`;
-  $('fb-avg-row').classList.remove('hidden');
-  $('fb-list').innerHTML = items.map(f => `
-    <div class="fb-item">
-      <div class="fb-item-top">
-        <span class="fb-item-stars">${'★'.repeat(f.stars || 0)}${'☆'.repeat(5 - (f.stars || 0))}</span>
-        <span class="fb-item-name">${escHtml(f.name || 'Anônimo')}</span>
-        <span class="fb-item-date">${fbFormatDate(f.timestamp)}</span>
+  try {
+    const valid = items.filter(Boolean);
+    if (valid.length === 0) {
+      $('fb-avg-row').classList.add('hidden');
+      $('fb-list').innerHTML = '<div class="mp-no-players">Nenhum feedback ainda. Seja o primeiro!</div>';
+      return;
+    }
+    const avg = valid.reduce((s, f) => s + (f.stars || 0), 0) / valid.length;
+    $('fb-avg-stars').textContent = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
+    $('fb-avg-num').textContent   = avg.toFixed(1);
+    $('fb-avg-count').textContent = `(${valid.length} avaliação${valid.length !== 1 ? 'ões' : ''})`;
+    $('fb-avg-row').classList.remove('hidden');
+    $('fb-list').innerHTML = valid.map(f => `
+      <div class="fb-item">
+        <div class="fb-item-top">
+          <span class="fb-item-stars">${'★'.repeat(f.stars || 0)}${'☆'.repeat(5 - (f.stars || 0))}</span>
+          <span class="fb-item-name">${escHtml(f.name || 'Anônimo')}</span>
+          <span class="fb-item-date">${fbFormatDate(f.timestamp)}</span>
+        </div>
+        ${f.text ? `<div class="fb-item-text">${escHtml(f.text)}</div>` : ''}
       </div>
-      ${f.text ? `<div class="fb-item-text">${escHtml(f.text)}</div>` : ''}
-    </div>
-  `).join('');
+    `).join('');
+  } catch (e) {
+    $('fb-list').innerHTML = `<div class="mp-no-players">Erro ao renderizar: ${escHtml(e.message)}</div>`;
+  }
 }
 
 async function fbSubmit() {
@@ -996,16 +1001,20 @@ async function fbSubmit() {
   btn.textContent = 'Enviando...';
   $('fb-error').classList.add('hidden');
   try {
-    await mp.db.ref('feedback').push({ name, stars: fbSelectedStars, text, timestamp: Date.now() });
+    const newRef = mp.db.ref('feedback').push();
+    await newRef.set({ name, stars: fbSelectedStars, text, timestamp: Date.now() });
+    const verify = await newRef.once('value');
+    if (!verify.exists()) {
+      throw new Error('Permissão negada. Nas regras do Firebase Realtime Database adicione ".read": true e ".write": true para o caminho "feedback".');
+    }
     $('fb-name').value = '';
     $('fb-text').value = '';
     fbSetStars(0);
     btn.textContent = '✓ Enviado!';
     setTimeout(() => { btn.disabled = false; btn.textContent = 'Enviar ✓'; }, 2000);
-    // a lista atualiza automaticamente via o listener on('value')
   } catch (e) {
     const err = $('fb-error');
-    err.textContent = `Erro ao enviar: ${e.message || 'tente novamente.'}`;
+    err.textContent = `Erro: ${e.message || 'tente novamente.'}`;
     err.classList.remove('hidden');
     btn.disabled    = false;
     btn.textContent = 'Enviar ✓';
